@@ -4,3 +4,4 @@ plotly
 openpyxl
 python-dateutil
 st-gsheets-connection
+pywhatkit
