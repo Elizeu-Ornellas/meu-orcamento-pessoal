@@ -8,8 +8,8 @@ import streamlit as st
 
 # --- CONFIGURAÇÃO DE CREDENCIAIS DE ACESSO ---
 # Altere para o usuário e senha desejados:
-USUARIO_CORRETO = "admin"
-SENHA_CORRETA = "12345"
+USUARIO_CORRETO = "92113001187"
+SENHA_CORRETA = "adbf1982"
 
 NOME_ARQUIVO = 'Orcamento_Pessoal.xlsx'
 
