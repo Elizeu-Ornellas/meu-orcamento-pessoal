@@ -6,6 +6,11 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+# --- CONFIGURAÇÃO DE CREDENCIAIS DE ACESSO ---
+# Altere para o usuário e senha desejados:
+USUARIO_CORRETO = "admin"
+SENHA_CORRETA = "12345"
+
 NOME_ARQUIVO = 'Orcamento_Pessoal.xlsx'
 
 
@@ -45,12 +50,47 @@ def salvar_dados(df):
 
 st.set_page_config(
     page_title="Gestão de Gastos & Orçamento",
-    page_icon="💳",
+    page_icon="🔒",
     layout="wide",
 )
-st.title("💳 Gestão de Gastos & Orçamento Pessoal")
 
-if 'df_dados' not in st.session_state:
+# --- GERENCIAMENTO DE SESSÃO DE LOGIN ---
+if "logado" not in st.session_state:
+  st.session_state.logado = False
+
+# ---------------------------------------------------------
+# TELA DE LOGIN (QUANDO NÃO ESTIVER LOGADO)
+# ---------------------------------------------------------
+if not st.session_state.logado:
+  st.title("🔒 Acesso ao Sistema de Gestão Financeira")
+  st.write("Por favor, faça login para acessar suas finanças.")
+
+  col_login1, col_login2, col_login3 = st.columns([1, 2, 1])
+
+  with col_login2:
+    with st.form(key="form_login"):
+      usuario_input = st.text_input("Usuário")
+      senha_input = st.text_input("Senha", type="password")
+      btn_entrar = st.form_submit_button("🔑 Entrar no Sistema")
+
+      if btn_entrar:
+        if (
+            usuario_input == USUARIO_CORRETO
+            and senha_input == SENHA_CORRETA
+        ):
+          st.session_state.logado = True
+          st.success("Login realizado com sucesso!")
+          st.rerun()
+        else:
+          st.error("Usuário ou senha incorretos. Tente novamente.")
+
+  st.stop()  # Interrompe a execução para não carregar o sistema abaixo sem login
+
+# ---------------------------------------------------------
+# SISTEMA PRINCIPAL (LIBERADO APÓS LOGIN)
+# ---------------------------------------------------------
+
+if "df_dados" not in st.session_state:
   st.session_state.df_dados = carregar_dados()
 
 df = st.session_state.df_dados
@@ -72,7 +112,15 @@ CATEGORIAS_RECEITA = [
 ]
 
 # --- MENU LATERAL ---
-st.sidebar.header("⚙️️ Operações")
+st.sidebar.title("💳 Menu Principal")
+
+# Botão de Logout na barra lateral
+if st.sidebar.button("🚪 Sair / Logout", use_container_width=True):
+  st.session_state.logado = False
+  st.rerun()
+
+st.sidebar.markdown("---")
+st.sidebar.header("⚙️ Operações")
 opcao_menu = st.sidebar.radio(
     "Escolha uma ação:",
     [
@@ -82,6 +130,8 @@ opcao_menu = st.sidebar.radio(
         "🗑️ Excluir Lançamento",
     ],
 )
+
+st.title("💳 Gestão de Gastos & Orçamento Pessoal")
 
 # ---------------------------------------------------------
 # 1. CADASTRAR NOVO
@@ -164,7 +214,7 @@ if opcao_menu == "➕ Cadastrar Novo Lançamento":
       st.rerun()
 
 # ---------------------------------------------------------
-# 2. ENVIAR ALERTAS WHATSAPP (COMPATÍVEL COM CELULAR/NUVEM)
+# 2. ENVIAR ALERTAS WHATSAPP
 # ---------------------------------------------------------
 elif opcao_menu == "📲 Enviar Alerta via WhatsApp":
   st.sidebar.subheader("📲 Notificação de Vencimentos")
@@ -180,7 +230,6 @@ elif opcao_menu == "📲 Enviar Alerta via WhatsApp":
   hoje = date.today()
   limite_venc = hoje + timedelta(days=dias_antecedencia)
 
-  # Filtra contas pendentes a vencer
   df_a_vencer = df[
       (df["Tipo"] == "Despesa")
       & (df["Status"] == "Pendente")
@@ -301,7 +350,7 @@ elif opcao_menu == "✏️ Alterar Lançamento":
 # ---------------------------------------------------------
 # 4. EXCLUIR LANÇAMENTO
 # ---------------------------------------------------------
-elif opcao_menu == "🗑️️ Excluir Lançamento":
+elif opcao_menu == "🗑️ Excluir Lançamento":
   st.sidebar.subheader("🗑️ Apagar Registro")
   if df.empty:
     st.sidebar.info("Nenhum registro para excluir.")
@@ -327,7 +376,6 @@ elif opcao_menu == "🗑️️ Excluir Lançamento":
 
 # --- PAINEL PRINCIPAL ---
 if not df.empty:
-  # Alertas de Vencimento Próximo
   hoje = date.today()
   limite_aviso = hoje + timedelta(days=5)
 
@@ -431,7 +479,4 @@ if not df.empty:
   st.dataframe(df_exibicao, use_container_width=True)
 
 else:
-  st.info(
-      "Nenhum lançamento registrado ainda. Selecione **'➕ Cadastrar Novo"
-      " Lançamento'** no menu lateral para começar!"
-  )
+  st.info("Nenhum lançamento registrado ainda.")
