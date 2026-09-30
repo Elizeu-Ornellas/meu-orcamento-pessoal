@@ -1,9 +1,9 @@
 from datetime import date, timedelta
 import os
+import urllib.parse
 import dateutil.relativedelta
 import pandas as pd
 import plotly.express as px
-import pywhatkit as pwk
 import streamlit as st
 
 NOME_ARQUIVO = 'Orcamento_Pessoal.xlsx'
@@ -44,9 +44,11 @@ def salvar_dados(df):
 
 
 st.set_page_config(
-    page_title="Sistema de Lançamento de Gastos & Notificações", layout="wide"
+    page_title="Gestão de Gastos & Orçamento",
+    page_icon="💳",
+    layout="wide",
 )
-st.title("💳 Gestão de Gastos & Avisos de Vencimento")
+st.title("💳 Gestão de Gastos & Orçamento Pessoal")
 
 if 'df_dados' not in st.session_state:
   st.session_state.df_dados = carregar_dados()
@@ -70,12 +72,12 @@ CATEGORIAS_RECEITA = [
 ]
 
 # --- MENU LATERAL ---
-st.sidebar.header("⚙️ Operações")
+st.sidebar.header("⚙️️ Operações")
 opcao_menu = st.sidebar.radio(
     "Escolha uma ação:",
     [
         "➕ Cadastrar Novo Lançamento",
-        "📲 Configurar Alertas WhatsApp",
+        "📲 Enviar Alerta via WhatsApp",
         "✏️ Alterar Lançamento",
         "🗑️ Excluir Lançamento",
     ],
@@ -162,66 +164,67 @@ if opcao_menu == "➕ Cadastrar Novo Lançamento":
       st.rerun()
 
 # ---------------------------------------------------------
-# 2. ENVIAR ALERTAS WHATSAPP
+# 2. ENVIAR ALERTAS WHATSAPP (COMPATÍVEL COM CELULAR/NUVEM)
 # ---------------------------------------------------------
-elif opcao_menu == "📲 Configurar Alertas WhatsApp":
+elif opcao_menu == "📲 Enviar Alerta via WhatsApp":
   st.sidebar.subheader("📲 Notificação de Vencimentos")
   numero_celular = st.sidebar.text_input(
       "Número do WhatsApp (com DDD):",
-      placeholder="ex: +5567999999999",
-      help="Digite no formato internacional: +55 + DDD + Número",
+      placeholder="ex: 5567999999999",
+      help="Apenas números: Código do país (55) + DDD + Número",
   )
   dias_antecedencia = st.sidebar.slider(
       "Avisar contas a vencer nos próximos (dias):", 1, 15, 5
   )
 
-  if st.sidebar.button("💬 Enviar Aviso WhatsApp", use_container_width=True):
-    if not numero_celular.strip() or not numero_celular.startswith("+"):
-      st.sidebar.error(
-          "Digite um número válido com DDD e código do país (ex:"
-          " +5567999999999)."
-      )
+  hoje = date.today()
+  limite_venc = hoje + timedelta(days=dias_antecedencia)
+
+  # Filtra contas pendentes a vencer
+  df_a_vencer = df[
+      (df["Tipo"] == "Despesa")
+      & (df["Status"] == "Pendente")
+      & (df["Vencimento"] >= hoje)
+      & (df["Vencimento"] <= limite_venc)
+  ]
+
+  if df_a_vencer.empty:
+    st.sidebar.info("Nenhuma conta pendente a vencer no período definido!")
+  else:
+    num_limpo = (
+        numero_celular.replace("+", "")
+        .replace("-", "")
+        .replace(" ", "")
+        .strip()
+    )
+
+    if not num_limpo:
+      st.sidebar.warning("Digite seu número de celular acima para gerar o link.")
     else:
-      hoje = date.today()
-      limite_venc = hoje + timedelta(days=dias_antecedencia)
-
-      # Filtra contas despesas pendentes a vencer
-      df_a_vencer = df[
-          (df["Tipo"] == "Despesa")
-          & (df["Status"] == "Pendente")
-          & (df["Vencimento"] >= hoje)
-          & (df["Vencimento"] <= limite_venc)
-      ]
-
-      if df_a_vencer.empty:
-        st.sidebar.info("Nenhuma conta pendente a vencer no período definido!")
-      else:
-        mensagem = (
-            "🔔 *AVISO DE VENCIMENTO DE CONTAS*\n\nOlá! Segue a lista de contas"
-            f" a vencer nos próximos {dias_antecedencia} dias:\n\n"
+      mensagem = (
+          "🔔 *AVISO DE VENCIMENTO DE CONTAS*\n\nOlá! Segue a lista de contas"
+          f" a vencer nos próximos {dias_antecedencia} dias:\n\n"
+      )
+      for _, row in df_a_vencer.iterrows():
+        venc_str = (
+            row["Vencimento"].strftime("%d/%m/%Y")
+            if isinstance(row["Vencimento"], date)
+            else str(row["Vencimento"])
         )
-        for _, row in df_a_vencer.iterrows():
-          venc_str = (
-              row["Vencimento"].strftime("%d/%m/%Y")
-              if isinstance(row["Vencimento"], date)
-              else str(row["Vencimento"])
-          )
-          mensagem += (
-              f"📌 *{row['Descrição']}*\n   Vencimento: {venc_str}\n   Valor: R$"
-              f" {row['Valor (R$)']:.2f}\n\n"
-          )
+        mensagem += (
+            f"📌 *{row['Descrição']}*\n   Vencimento: {venc_str}\n   Valor: R$"
+            f" {row['Valor (R$)']:.2f}\n\n"
+        )
 
-        try:
-          # Abre o WhatsApp Web e digita a mensagem automaticamente
-          pwk.sendwhatmsg_instantly(
-              phone_no=numero_celular,
-              message=mensagem,
-              wait_time=15,
-              tab_close=True,
-          )
-          st.sidebar.success("WhatsApp aberto para envio da mensagem!")
-        except Exception as e:
-          st.sidebar.error(f"Erro ao disparar WhatsApp: {e}")
+      msg_url = urllib.parse.quote(mensagem)
+      whatsapp_link = f"https://wa.me/{num_limpo}?text={msg_url}"
+
+      st.sidebar.markdown(
+          f'<a href="{whatsapp_link}" target="_blank" style="text-decoration:none;">'
+          '<button style="width:100%; background-color:#25D366; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer;">'
+          "💬 Abrir WhatsApp e Enviar Aviso</button></a>",
+          unsafe_allow_html=True,
+      )
 
 # ---------------------------------------------------------
 # 3. ALTERAR LANÇAMENTO
@@ -298,7 +301,7 @@ elif opcao_menu == "✏️ Alterar Lançamento":
 # ---------------------------------------------------------
 # 4. EXCLUIR LANÇAMENTO
 # ---------------------------------------------------------
-elif opcao_menu == "🗑️ Excluir Lançamento":
+elif opcao_menu == "🗑️️ Excluir Lançamento":
   st.sidebar.subheader("🗑️ Apagar Registro")
   if df.empty:
     st.sidebar.info("Nenhum registro para excluir.")
@@ -322,7 +325,7 @@ elif opcao_menu == "🗑️ Excluir Lançamento":
       st.sidebar.success("Registro excluído com sucesso!")
       st.rerun()
 
-# --- PAINEL PRINCIPAL (ALERTAS E DASHBOARD) ---
+# --- PAINEL PRINCIPAL ---
 if not df.empty:
   # Alertas de Vencimento Próximo
   hoje = date.today()
@@ -428,4 +431,7 @@ if not df.empty:
   st.dataframe(df_exibicao, use_container_width=True)
 
 else:
-  st.info("Nenhum lançamento registrado ainda.")
+  st.info(
+      "Nenhum lançamento registrado ainda. Selecione **'➕ Cadastrar Novo"
+      " Lançamento'** no menu lateral para começar!"
+  )
