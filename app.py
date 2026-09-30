@@ -49,8 +49,8 @@ def salvar_dados(df):
 
 
 st.set_page_config(
-    page_title="Gestão de Gastos & Orçamento",
-    page_icon="🔒",
+    page_title="Minhas Finanças",
+    page_icon="📊",  # Você pode trocar por "💰💳", "💵", "📊" ou o link de uma imagem .png
     layout="wide",
 )
 
@@ -220,7 +220,7 @@ elif opcao_menu == "📲 Enviar Alerta via WhatsApp":
   st.sidebar.subheader("📲 Notificação de Vencimentos")
   numero_celular = st.sidebar.text_input(
       "Número do WhatsApp (com DDD):",
-      placeholder="ex: 5567999999999",
+      placeholder="ex: 5567998680085",
       help="Apenas números: Código do país (55) + DDD + Número",
   )
   dias_antecedencia = st.sidebar.slider(
